@@ -27,9 +27,10 @@ This bot is designed to select a target for each player so that all the players 
 - `/sign_up`: Sign up for the game.
   - _name_: Player's name (optional).
   - _instruction_: Kill instruction (optional).
-- `/change_information`: Change your player name or kill instruction.
+- `/change_name`: Change your player name.
   - _name_: New player name (optional).
-  - _instruction_: New kill instruction (optional).
+- `/add_instruction`: Add more instructions.
+  - _instruction_: Kill instruction (optional).
 - `/get_target`: Get your current target and kill instruction.
 - `/kill`: Report a successful kill and get your next target.
 
