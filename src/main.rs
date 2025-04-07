@@ -174,7 +174,7 @@ impl std::fmt::Debug for Instructions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Instructions")
             .field(
-                &format!("({:#?}) instructions", &self.id),
+                &format!("({:#?}) instructions: {:#?}", &self.id, &self.instructions),
                 &self.instructions,
             )
             .finish()
@@ -473,12 +473,13 @@ fn term(initial_data: Option<(Vec<Player>, Vec<Instructions>)>) {
     }
 }
 
+/// Manually add a player using id
 #[poise::command(prefix_command, slash_command)]
 async fn add_player(
     ctx: BotContext<'_>,
     #[description = "User Id"] id: Option<u64>,
-    #[description = "Your player name"] name: Option<String>,
-    #[description = "Your kill instruction"] instruction: Option<String>,
+    #[description = "Player name"] name: Option<String>,
+    #[description = "Kill instruction"] instruction: Option<String>,
 ) -> Result<(), Error> {
     if !Player::is_admin(ctx).await.unwrap() {
         return Ok(());
@@ -499,22 +500,24 @@ async fn sign_up(
     Ok(())
 }
 
+/// Change the name before starting the game.
 #[poise::command(prefix_command, slash_command)]
-async fn change_information(
+async fn change_name(
     ctx: BotContext<'_>,
     #[description = "Your new player name"] name: Option<String>,
-    #[description = "Your new kill instruction"] instruction: Option<String>,
 ) -> Result<(), Error> {
     let mut signups = ctx.data().signups.lock().await;
-    let mut instructions = ctx.data().instructions.lock().await;
     let mut game_state = ctx.data().game_state.lock().await;
 
     if States::is_playing(game_state.as_mut().unwrap()) {
-        ctx.say("Game already started. Cannot change information up.")
+        ctx.say("Game already started. Cannot change name anymore.")
             .await?;
         return Ok(());
     } else if *game_state == Some(States::Finished) {
-        ctx.say("Game already finished. Cannot change information up. Ask the admin to start a new game").await?;
+        ctx.say(
+            "Game already finished. Cannot change name anymore. Ask the admin to start a new game",
+        )
+        .await?;
         return Ok(());
     }
 
@@ -552,40 +555,56 @@ async fn change_information(
                 return Ok(());
             }
             _ => {
-                signup(ctx, Some(ctx.author().id.get()), name, instruction).await?;
+                signup(ctx, Some(ctx.author().id.get()), name, None).await?;
                 return Ok(());
             }
         };
     }
 
-    let mut kill_instruction: Option<String> = instruction;
-
-    if kill_instruction.is_none() {
-        kill_instruction = kill_instrucion_missing(ctx).await.unwrap();
+    if let Some(player) = signups
+        .as_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|p| p.id == ctx.author().id.get())
+    {
+        player.name = name.unwrap_or_else(|| ctx.author().name.clone())
     }
 
-    let mut player: Player = signups
-        .as_mut()
-        .unwrap()
-        .iter()
-        .find(|p| p.id == ctx.author().id.get())
-        .unwrap()
-        .clone();
-
-    player.name = name.unwrap();
-
-    let mut instruction: Instructions = instructions
-        .as_mut()
-        .unwrap()
-        .iter()
-        .find(|p| p.id == ctx.author().id.get())
-        .unwrap()
-        .clone();
-
-    instruction.instructions = kill_instruction.unwrap();
-
-    ctx.say("You have changed the information. Please wait for the game to start.")
+    ctx.say("You have changed your name. Please wait for the game to start.")
         .await?;
+
+    Ok(())
+}
+
+/// Allows a player to add more instructions
+#[poise::command(prefix_command, slash_command)]
+async fn add_instruction(
+    ctx: BotContext<'_>,
+    #[description = "Instructions to add"] instruction: Option<String>,
+) -> Result<(), Error> {
+    let mut instructions = ctx.data().instructions.lock().await;
+    let mut game_state = ctx.data().game_state.lock().await;
+    if States::is_playing(game_state.as_mut().unwrap()) {
+        ctx.say("Game already started. Cannot change name anymore.")
+            .await?;
+        return Ok(());
+    } else if *game_state == Some(States::Finished) {
+        ctx.say(
+            "Game already finished. Cannot change name anymore. Ask the admin to start a new game",
+        )
+        .await?;
+        return Ok(());
+    }
+
+    if instruction.is_none() {
+        ctx.say("No instruction provided!").await?;
+    } else {
+        instructions.as_mut().unwrap().push(Instructions::new(
+            Some(ctx.author().id.get()),
+            instruction.unwrap(),
+        ));
+        ctx.say("Instruction added correctly.").await?;
+    }
 
     Ok(())
 }
@@ -622,6 +641,7 @@ async fn set_channel(
     Ok(())
 }
 
+/// Get the channel where announcements will be set
 #[poise::command(prefix_command, slash_command)]
 async fn get_channel(ctx: BotContext<'_>) -> Result<(), Error> {
     let channel_id = ctx.data().channel_id.lock().await;
@@ -640,6 +660,7 @@ async fn get_channel(ctx: BotContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Starts the game. Used by admins
 #[poise::command(prefix_command, slash_command)]
 async fn start_game(ctx: BotContext<'_>) -> Result<(), Error> {
     if !Player::is_admin(ctx).await.unwrap() {
@@ -655,8 +676,8 @@ async fn start_game(ctx: BotContext<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    if signups.as_mut().unwrap().len() < 4 {
-        ctx.say("Not enough players have signed up. Need at least 4.")
+    if signups.as_mut().unwrap().len() < 3 {
+        ctx.say("Not enough players have signed up. Need at least 3.")
             .await?;
         return Ok(());
     }
@@ -705,6 +726,7 @@ async fn get_target(ctx: BotContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Kill your target. You will recieve a new one
 #[poise::command(prefix_command, slash_command)]
 async fn kill(ctx: BotContext<'_>) -> Result<(), Error> {
     let mut objectives = ctx.data().objectives.lock().await;
@@ -736,7 +758,7 @@ async fn kill(ctx: BotContext<'_>) -> Result<(), Error> {
         .await?;
 
     ctx.say(format!(
-        "Your target is: {}.\nYour kill instruction is: !kill {}",
+        "Your target is: {}.\nYour kill instruction is: {}",
         objective.target.name,
         objective.instructions.unwrap().instructions
     ))
@@ -745,6 +767,7 @@ async fn kill(ctx: BotContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Admin use. Inform players of their targets
 #[poise::command(prefix_command, slash_command)]
 async fn inform(ctx: BotContext<'_>) -> Result<(), Error> {
     if !Player::is_admin(ctx).await.unwrap() {
@@ -781,7 +804,7 @@ async fn inform(ctx: BotContext<'_>) -> Result<(), Error> {
             &ctx.http(),
             message.content(
                 format!(
-                    "Hello {}, your target is {}, and your kill instruction is: !kill {}",
+                    "Hello {}, your target is {}, and your kill instruction is: {} (use /kill to eliminate target)",
                     objective.player.name,
                     objective.target.name,
                     objective.instructions.as_ref().unwrap().instructions
@@ -797,6 +820,7 @@ async fn inform(ctx: BotContext<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+/// Admin use. Reveal all information from signup and targets
 #[poise::command(prefix_command, slash_command)]
 async fn reveal(ctx: BotContext<'_>) -> Result<(), Error> {
     if !Player::is_admin(ctx).await.unwrap() {
@@ -825,20 +849,23 @@ async fn reveal(ctx: BotContext<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    for signup in signups.as_mut().unwrap() {
-        ctx.say(format!(
-            "{} wrote the instruction {:#?}",
-            signup.name,
-            instructions
+    let mut message: String = Default::default();
+
+    for instruction in instructions.as_mut().unwrap() {
+        message.push_str(&format!(
+            "{} wrote the instruction {:#?}\n",
+            signups
                 .as_mut()
                 .unwrap_or(&mut vec![])
                 .iter()
-                .find(|instruction| instruction.id == signup.id)
+                .find(|signup| signup.id == instruction.id)
                 .unwrap()
-                .instructions,
-        ))
-        .await?;
+                .name,
+            instruction.instructions
+        ));
     }
+
+    ctx.say(message).await?;
 
     for objective in objectives.as_mut().unwrap_or(&mut vec![]) {
         ctx.say(format!(
@@ -859,33 +886,7 @@ async fn main() {
 
     if args.len() > 1 {
         println!("Running in the terminal.");
-        let initial_data_players: Vec<Player> = vec![
-            Player::new(Some(0), "0".to_string()),
-            Player::new(Some(1), "1".to_string()),
-            Player::new(Some(2), "2".to_string()),
-            Player::new(Some(3), "3".to_string()),
-            Player::new(Some(4), "4".to_string()),
-            Player::new(Some(5), "5".to_string()),
-            Player::new(Some(6), "6".to_string()),
-            Player::new(Some(7), "7".to_string()),
-            Player::new(Some(8), "8".to_string()),
-            Player::new(Some(9), "9".to_string()),
-            Player::new(Some(10), "10".to_string()),
-        ];
-        let initial_data_instructions: Vec<Instructions> = vec![
-            Instructions::new(Some(0), "0".to_string()),
-            Instructions::new(Some(1), "1".to_string()),
-            Instructions::new(Some(2), "2".to_string()),
-            Instructions::new(Some(3), "3".to_string()),
-            Instructions::new(Some(4), "4".to_string()),
-            Instructions::new(Some(5), "5".to_string()),
-            Instructions::new(Some(6), "6".to_string()),
-            Instructions::new(Some(7), "7".to_string()),
-            Instructions::new(Some(8), "8".to_string()),
-            Instructions::new(Some(9), "9".to_string()),
-            Instructions::new(Some(10), "10".to_string()),
-        ];
-        term(Some((initial_data_players, initial_data_instructions)));
+        term(None);
         return;
     }
 
@@ -908,7 +909,8 @@ async fn main() {
             commands: vec![
                 add_player(),
                 sign_up(),
-                change_information(),
+                change_name(),
+                add_instruction(),
                 get_target(),
                 set_channel(),
                 get_channel(),

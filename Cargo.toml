@@ -1,7 +1,10 @@
 [package]
 name = "algol"
 version = "0.1.0"
+authors = ["Arnau del Río"]
 edition = "2021"
+readme = "README.md"
+repository = "https://github.com/arnaudelrio/algol"
 
 [dependencies]
 serenity = "0.12"
