@@ -473,6 +473,19 @@ fn term(initial_data: Option<(Vec<Player>, Vec<Instructions>)>) {
     }
 }
 
+#[poise::command(prefix_command, slash_command)]
+async fn help(ctx: BotContext<'_>) -> Result<(), Error> {
+    let help_message = "
+Welcome to this discord bot! This bot should help assign a target and kill instructions more easily.
+
+Each player should `/sign_up` first, and enter a name and kill instructions. Then, the `admin` can use `/start_game`, and then `/inform`. Once this is done, the game will have started, and will last until the last player uses the `/kill` command.
+
+Good luck and happy hunting!
+    ";
+    ctx.say(help_message).await?;
+    Ok(())
+}
+
 /// Manually add a player using id
 #[poise::command(prefix_command, slash_command)]
 async fn add_player(
@@ -907,6 +920,7 @@ async fn main() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
+                help(),
                 add_player(),
                 sign_up(),
                 change_name(),
