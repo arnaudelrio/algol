@@ -8,7 +8,7 @@ repository = "https://github.com/arnaudelrio/algol"
 
 [dependencies]
 serenity = "0.12"
-tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
