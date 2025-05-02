@@ -3,6 +3,8 @@ Algol is a Discord bot designed to facilitate a game of "Assassin" where players
 
 This bot is designed to select a target for each player so that all the players for a unique and closed loop, and so that a player doesn't have or can't be killed by their own instructions. This means that there is a minimum of 4 players required.
 
+The name _algol_ comes from the arabic Ra's al Ghul, which roughly translates to "Demon head", and it's the name of the leader of the league of assassins in the DC comics.
+
 ## Features
 - **Sign Up**: Players can sign up for the game with a username and a kill instruction.
 - **Admin Commands**: The first player to sign up becomes the admin and can manage the game.
